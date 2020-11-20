@@ -58,7 +58,7 @@ export default class Scheduler extends Component {
     obj.id=this.state.currentId;
     let subId=this.state.currentId===''?'':this.state.currentId;
     console.log(obj);
-    fetch(baseUrl+'interviews/'+subId,{
+    fetch(baseUrl+'interview/'+subId,{
       method:'POST',
       body:JSON.stringify(obj),
       headers:{
@@ -166,7 +166,6 @@ export default class Scheduler extends Component {
           
             <p>From : </p>
             <DateTimePicker
-            disableClock={false}
             value={this.state.startTime}
             minDate={new Date()}
             hourPlaceholder="Hour"
@@ -175,7 +174,6 @@ export default class Scheduler extends Component {
             />
             <p>To : </p>
             <DateTimePicker
-            disableClock={false}
             hourPlaceholder="Hour"
             minutePlaceholder="Min"
             minDate={this.state.startTime}

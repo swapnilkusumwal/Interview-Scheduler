@@ -14,7 +14,7 @@ export default class Interviews extends Component {
   
   componentDidMount(){
     console.log(this.props.location)
-    fetch(baseUrl+'interviews',{
+    fetch(baseUrl+'interview',{
       headers:{
         'Content-Type': 'application/json'
       },
@@ -61,7 +61,7 @@ export default class Interviews extends Component {
           <tbody>
             {this.state.interviews.map((interview)=>{
               return (
-                <tr>
+                <tr key={interview._id}>
                   <td>
                     <p>{new Date(interview.startTime).toLocaleTimeString()}</p>
                     <p>{new Date(interview.startTime).toLocaleDateString()}</p>

@@ -43,7 +43,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 
 app.use('/users', usersRouter);
-app.use('/interviews', interviewsRouter);
+app.use('/interview', interviewsRouter);
 app.use('/', indexRouter);
 
 // catch 404 and forward to error handler

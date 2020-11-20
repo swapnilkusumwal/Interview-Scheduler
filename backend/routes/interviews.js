@@ -12,7 +12,7 @@ let mailOptions = {
   subject: "Interview Schedule",
 };
 router.get("/", (req, res, next) => {
-  Interviews.find().then((data) => {
+  Interviews.find({startTime:{$gte:new Date()}}).then((data) => {
     let result = data.map((a) => a._id.toString());
     UserInterviews.find({ interview: { $in: result } })
       .populate("email")
