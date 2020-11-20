@@ -1,6 +1,6 @@
 # Interview Scheduler 
-___
-An app that helps you schedule interviews much more efficiently. 
+
+An app that helps you schedule interviews efficiently and saves you the hassle of manual scheduling. 
 
 ## Top Features:
 - Gives a glance at all the upcoming interviews.
