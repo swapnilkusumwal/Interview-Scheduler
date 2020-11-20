@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { baseUrl } from '../baseUrl';
-
+import { NavItem} from 'reactstrap';
+import { NavLink } from 'react-router-dom';
 export default class Interviews extends Component {
 
   constructor(props) {
@@ -45,7 +46,7 @@ export default class Interviews extends Component {
 
   render() {
     return (
-      <div>
+      <div className>
         <h4 className="text-center">Upcoming interviews</h4>
         <table className="table table-sm table-dark" style={{color:'white'}}>
           <thead>
@@ -62,9 +63,11 @@ export default class Interviews extends Component {
               return (
                 <tr>
                   <td>
-                    {new Date(interview.startTime).toUTCString()}
+                    <p>{new Date(interview.startTime).toLocaleTimeString()}</p>
+                    <p>{new Date(interview.startTime).toLocaleDateString()}</p>
                   </td>
-                  <td>{new Date(interview.endTime).toUTCString()}</td>
+                  <td><p>{new Date(interview.endTime).toLocaleTimeString()} </p>
+                  <p>{new Date(interview.endTime).toLocaleDateString()}</p></td>
                   <td>
                       {interview.interviewer.map((interviewer)=>{
                         return(
@@ -88,7 +91,7 @@ export default class Interviews extends Component {
                       })}
                   </td>
 
-                <td><a href={"/scheduler/"+(interview._id)}><button className="btn btn-primary">Edit</button></a></td>
+                <td><NavItem><NavLink to={"/scheduler/"+(interview._id)}><button className="btn btn-primary">Edit</button></NavLink></NavItem></td>
                 </tr> 
               )
             })}

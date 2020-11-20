@@ -63,6 +63,7 @@ export default class Scheduler extends Component {
           var errmess = new Error(error.message);
           throw errmess;
     })
+    .then(response=>response.json())
     .catch(error=>{console.log('Submit interview details ',error.message)
       alert('Interview could not be scheduled due to clash \n'+error.message)})
   }

@@ -3,7 +3,7 @@ import {baseUrl} from '../baseUrl.js'
 import DateTimePicker from 'react-datetime-picker';
 
 
-var selectedCandidates=[],selectedInterviewers=[];
+var selectedCandidates=[],selectedInterviewers=[],selectedCandidatesEmail=[];
 export default class Scheduler extends Component {
   constructor(props) {
     super(props);
@@ -20,13 +20,15 @@ export default class Scheduler extends Component {
     this.handleSubmit = this.handleSubmit.bind(this);
   }
   
-  handleChangeSelect=(id)=>{
+  handleChangeSelect=(id,email)=>{
     let index=selectedCandidates.indexOf(id);
     if(index===-1){
       selectedCandidates.push(id);
+      selectedCandidatesEmail.push(email);
     }
     else{
       selectedCandidates.splice(index,1);
+      selectedCandidatesEmail.splice(index,1);
     }
     console.log(selectedCandidates.length);
   }
@@ -41,9 +43,6 @@ export default class Scheduler extends Component {
   }
   handleSubmit=()=>{
 
-    if(selectedCandidates.length<2){
-      alert("Please select atleast 2 candidates.");
-    }
     if(this.state.startTime>this.state.endTime){
       alert("Please select appropriate time values.");
     }
@@ -52,7 +51,8 @@ export default class Scheduler extends Component {
       startTime:this.state.startTime,
       endTime:this.state.endTime,
       selectedCandidates,
-      selectedInterviewers
+      selectedInterviewers,
+      selectedCandidatesEmail
     }
     if(this.state.currentId!=='' && this.state.currentId!='undefined')
     obj.id=this.state.currentId;
@@ -72,22 +72,20 @@ export default class Scheduler extends Component {
         alert('Interview schduled!');
         return response;
       } else {
-        var error = new Error('Error ' + response.status + ': ' + response.statusText);
-        error.response = response;
-        throw error;
+        return response.json().then((body) => {
+          // throw ("Error "+response.status.toString()+" "+response.statusText+" \n"+body)
+          throw(body);
+        })
       }
-    },
-    error => {
-          var errmess = new Error(error.message);
-          throw errmess;
     })
-    .catch(error=>{console.log('Submit interview details ',error.message)
-      alert('Interview could not be scheduled due to clash \n'+error.message)})
+    .then(response=>response.json())
+    .catch(error=>{console.log('Submit interview details ',error)
+      alert('Interview Schedule error \n'+error)})
     }
   }
 
   fetchCandidateList=()=>{
-
+    // debugger; 
     fetch(baseUrl+'users',{
       headers:{
         'Content-Type': 'application/json'
@@ -120,7 +118,11 @@ export default class Scheduler extends Component {
       alert('Candidates could not be fetched \nError: '+error.message)})
   }
   componentDidMount(){
-    let currId=window.location.href.substr(32);
+    selectedCandidates=[];
+    selectedCandidatesEmail=[];
+    selectedInterviewers=[];
+    // let currId=window.location.href.substring(36);
+    let currId=window.location.href.substring(32);
     if(currId!==''){
       this.setState({currentId:currId});
     }
@@ -129,7 +131,7 @@ export default class Scheduler extends Component {
 
   render() {
     return (
-      <div className="row m-auto ml-0" style={{paddingTop:10}}>
+      <div className="row m-auto ml-0 background" style={{paddingTop:10}}>
         
         <div className="col-12">
           <h4 className="text-center">SCHEDULE INTERVIEW</h4>
@@ -148,8 +150,9 @@ export default class Scheduler extends Component {
                   <tr key={user.email} >
                     <td>{user.name}</td>
                     <td>{user.email}</td>
-                    <td><input type="checkbox" onClick={()=>this.handleChangeInterviewer(user._id)} /></td>
-                    <td><input type="checkbox" onClick={()=>this.handleChangeSelect(user._id)} /></td>
+
+                    <td><input type="checkbox" onClick={()=>this.handleChangeInterviewer(user._id)} value={selectedCandidates.indexOf(user._id)===-1?false:true} /></td>
+                    <td><input type="checkbox" onClick={()=>this.handleChangeSelect(user._id,user.email)} value={selectedInterviewers.indexOf(user._id)===-1?false:true}  /></td>
                   </tr> 
                 )
               })}
@@ -165,7 +168,7 @@ export default class Scheduler extends Component {
             <DateTimePicker
             disableClock={false}
             value={this.state.startTime}
-            minDate={this.state.startTime===''?new Date():this.state.startTime}
+            minDate={new Date()}
             hourPlaceholder="Hour"
             minutePlaceholder="Min"
             onChange={(value)=>{this.setState({startTime:value})}}
@@ -188,3 +191,13 @@ export default class Scheduler extends Component {
     );
   }
 }
+
+// const styles={
+//   style:{
+//     backgroundImage: "url(" + "background.jpg" + ")",
+//     backgroundPosition: 'center',
+//     backgroundSize: 'cover',
+//     backgroundRepeat: 'no-repeat',
+//     height:'100vh'
+//   }
+// }

@@ -1,7 +1,17 @@
 body {
   font-family: 'Titillium Web', sans-serif;
-  color: 'black';
+  color: 'white';
+  /* background-image: url("background.jpg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover; */
 }
+/* .background{
+  background-image: url("background.jpg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+} */
 .header{
   background-image:linear-gradient(to right,#E6E6FA,#0673f0);
   display: flex;

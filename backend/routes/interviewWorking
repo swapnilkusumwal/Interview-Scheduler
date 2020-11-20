@@ -2,8 +2,6 @@ var express = require("express");
 const Interviews = require("../models/interviews");
 var router = express.Router();
 const UserInterviews = require("../models/userInterviews");
-var moment=require('moment');
-// console.log(moment)
 /* GET users listing. */
 var smtp = require("../smtp");
 
@@ -18,7 +16,7 @@ router.get("/", (req, res, next) => {
       .populate("email")
       .populate("interview")
       .then((result) => {
-        // console.log(result);
+        console.log(result);
         var reply = [];
         let hash_map = {};
         let k = 0;
@@ -51,14 +49,13 @@ router.get("/", (req, res, next) => {
         // console.log(result);
         res.statusCode = 200;
         res.setHeader("Content-Type", "application/json");
-        res.json({interviews:reply});
-        res.end();
+        res.send({ interviews: reply });
       })
       .catch((err) => {
-        res.statusCode=400;
-        res.setHeader("Content-Type", "application/json");
-        res.json("Failed to fetch interview list.");
-        res.end();
+        let err1 = new Error();
+        err1.message = "Could not fetch interviews";
+        err1.statusCode = 400;
+        res.send(err1);
       });
   });
 });
@@ -66,9 +63,14 @@ router.get("/", (req, res, next) => {
 router.post("/", function (req, res, next) {
   console.log("STILL HERE");
   if (req.body.selectedCandidates.length < 2) {
+    let err = new Error();
+    err.message = "Select atleast 2 candidates";
+    err.statusCode = 400;
     res.setHeader("Content-Type", "application/json");
-    res.statusCode = 400;
-    res.json("Select atleast 2 candidates.")
+    res.status(400).json({
+      status: "error",
+      error: "select 2 candidates atleast.",
+    });
     res.end();
     return;
   }
@@ -102,7 +104,7 @@ router.post("/", function (req, res, next) {
         let result = [];
         if (data.length) {
           result = data.map((a) => a._id.toString());
-          // console.log(result);
+          console.log(result);
           await UserInterviews.find({
             $and: [
               { interview: { $in: result } },
@@ -114,7 +116,7 @@ router.post("/", function (req, res, next) {
                 if (data.length > 0) {
                   res.statusCode = 400;
                   res.setHeader("Content-Type", "application/json");
-                  res.json("Conflicting Interviews");
+                  res.send({ error: "Conflicting interviews" });
                   res.end();
                 } else {
                   await Interviews.create({
@@ -141,10 +143,10 @@ router.post("/", function (req, res, next) {
                           mailOptions.to = selectedCandidatesEmail[i];
                           mailOptions.html =
                             `<body>` +
-                            `<p>Your interview is scheduled From: ${moment(req.body.startTime).format('LLLL')}\n To: ${moment(req.body.endTime).format('LLLL')}
+                            `<p>Your interview is scheduled from ${req.body.startTime} to ${req.body.endTime}
             </p>` +
                             `</body>`;
-                          // console.log(mailOptions);
+                          console.log(mailOptions);
                           smtp.temp(mailOptions);
                           if (
                             selectedInterviewers.indexOf(
@@ -160,7 +162,7 @@ router.post("/", function (req, res, next) {
                             (data) => {
                               res.statusCode = 200;
                               res.setHeader("Content-Type", "application/json");
-                              res.json("Interview Scheduled");
+                              res.json(data);
                               res.end();
                             },
                             (err) => next(err)
@@ -196,10 +198,10 @@ router.post("/", function (req, res, next) {
                   mailOptions.to = selectedCandidatesEmail[i];
                   mailOptions.html =
                     `<body>` +
-                    `<p>Your interview is scheduled From: ${moment(req.body.startTime).format('LLLL')}\n To: ${moment(req.body.endTime).format('LLLL')}
+                    `<p>Your interview is scheduled from ${req.body.startTime} to ${req.body.endTime}
             </p>` +
                     `</body>`;
-                  // console.log(mailOptions);
+                  console.log(mailOptions);
                   smtp.temp(mailOptions);
                   if (
                     selectedInterviewers.indexOf(selectedCandidates[i]) === -1
@@ -213,7 +215,7 @@ router.post("/", function (req, res, next) {
                     (data) => {
                       res.statusCode = 200;
                       res.setHeader("Content-Type", "application/json");
-                      res.json("Interview Scheduled");
+                      res.json(data);
                       res.end();
                     },
                     (err) => next(err)
@@ -230,15 +232,8 @@ router.post("/", function (req, res, next) {
     .catch((err) => next(err));
 });
 router.post("/:currentid", function (req, res, next) {
-  if (req.body.selectedCandidates.length < 2) {
-    res.setHeader("Content-Type", "application/json");
-    res.statusCode=400;
-    res.json("Select atleast 2 candidates.");
-    res.end();
-    return;
-  }
   console.log(req.params.currentid);
-  // console.log(req.body);
+  console.log(req.body);
   let startTime = req.body.startTime;
   let endTime = req.body.endTime;
   Interviews.find({
@@ -269,76 +264,50 @@ router.post("/:currentid", function (req, res, next) {
       { _id: { $ne: req.body.id } },
     ],
   })
-    .then(async(data) => {
+    .then((data) => {
       let result = [];
       if (data.length) {
         result = data.map((a) => a._id.toString());
-        // console.log(result);
-        await UserInterviews.find({
-          $and: [
-            { interview: { $in: result } },
-            { email: { $in: req.body.selectedCandidates } },
-          ],
-        })
-        .then(async (data) => {
+        console.log(result);
+        UserInterviews.find({ interview: { $in: result } }).then((data) => {
           if (data.length > 0) {
-            res.statusCode = 400;
-            res.setHeader("Content-Type", "application/json");
-            res.json("Clashing Interviews");
-            res.end();
-            return;
+            result = data.map((a) => a.email.toString());
+            for (let i = 0; i < req.body.selectedCandidates.length; i++) {
+              console.log(
+                result.indexOf(req.body.selectedCandidates[i]),
+                "yoyoy"
+              );
+              if (result.indexOf(req.body.selectedCandidates[i]) !== -1) {
+                res.statusCode = 400;
+                res.setHeader("Content-Type", "application/json");
+                let err = new Error();
+                err.message = "Clashing interviews";
+                err.status = 400;
+                next(err);
+                res.send("Failed");
+                return -1;
+              }
+            }
+            return 1;
           } else {
-            await Interviews.findByIdAndUpdate(
-              req.body.id,
-              { startTime: req.body.startTime, endTime: req.body.endTime },
-              { upsert: true }
-            )
-              .then(async(data) => {
-                return data._id;
-              })
-              .then(async (id) => {
-                let insertionArray = [];
-                let selectedCandidates = req.body.selectedCandidates,
-                  selectedInterviewers = req.body.selectedInterviewers;
-                let selectedCandidatesEmail = req.body.selectedCandidatesEmail;
-                // console.log(req.body.selectedCandidates,"ASDSADASDAS");
-                for (let i = 0; i < selectedCandidates.length; i++) {
-                  mailOptions.to = selectedCandidatesEmail[i];
-                  mailOptions.html =
-                    `<body>` +
-                    `<p>Your interview is scheduled From: ${moment(req.body.startTime).format('LLLL')}\n To: ${moment(req.body.endTime).format('LLLL')}
-              </p>` +
-                    `</body>`;
-                  // console.log(mailOptions);
-                  smtp.temp(mailOptions);
-                  let obj = { email: selectedCandidates[i], interview: id };
-                  if (selectedInterviewers.indexOf(selectedCandidates[i]) === -1) {
-                    obj.role = false;
-                  } else obj.role = true;
-                  insertionArray.push(obj);
-                }
-                await UserInterviews.deleteMany({ interview: id }).then(async() => {
-                  await UserInterviews.create(insertionArray).then(() => {
-                    res.statusCode = 200;
-                    res.setHeader("Content-Type", "application/json");
-                    res.json("Interview Scheduled");
-                    res.end();
-                    return;
-                  });
-                });
-              });
+            return 1;
           }
         });
       } else {
-        await Interviews.findByIdAndUpdate(
+        return 1;
+      }
+    })
+    .then((data) => {
+      if (data === 1) {
+        Interviews.findByIdAndUpdate(
           req.body.id,
           { startTime: req.body.startTime, endTime: req.body.endTime },
           { upsert: true }
         )
-          .then(async(data) => {
+          .then((data) => {
             return data._id;
           })
-          .then(async (id) => {
+          .then((id) => {
             let insertionArray = [];
             let selectedCandidates = req.body.selectedCandidates,
               selectedInterviewers = req.body.selectedInterviewers;
@@ -348,10 +317,10 @@ router.post("/:currentid", function (req, res, next) {
               mailOptions.to = selectedCandidatesEmail[i];
               mailOptions.html =
                 `<body>` +
-                `<p>Your interview is scheduled From: ${moment(req.body.startTime).format('LLLL')}\n To: ${moment(req.body.endTime).format('LLLL')}
+                `<p>Your interview is scheduled from ${req.body.startTime} to ${req.body.endTime}
           </p>` +
                 `</body>`;
-              // console.log(mailOptions);
+              console.log(mailOptions);
               smtp.temp(mailOptions);
               let obj = { email: selectedCandidates[i], interview: id };
               if (selectedInterviewers.indexOf(selectedCandidates[i]) === -1) {
@@ -359,19 +328,25 @@ router.post("/:currentid", function (req, res, next) {
               } else obj.role = true;
               insertionArray.push(obj);
             }
-            console.log(insertionArray);
-            await UserInterviews.deleteMany({ interview: id }).then(async() => {
-              await UserInterviews.create(insertionArray).then(() => {
+            UserInterviews.deleteMany({ interview: id }).then(() => {
+              UserInterviews.create(insertionArray).then(() => {
                 res.statusCode = 200;
                 res.setHeader("Content-Type", "application/json");
-                res.json("Interview Scheduled");
-                res.end();
+                res.send({ fine: "fine" });
                 return;
               });
             });
           });
+      } else {
+        let err = new Error();
+        err.message = "No such interview exists";
+        err.statusCode = 400;
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json");
+        res.send(err);
+        return;
       }
-    })
+    });
 });
 
 module.exports = router;

@@ -15,6 +15,7 @@ class MainComponent extends Component{
       <Header/>
         <Switch location={this.props.location}>
           <Route path='/scheduler' component={Scheduler} />
+          <Route path='/scheduler/:id' component={Scheduler} />
           <Route path='/interviews' component={Interviews} />
           <Redirect to="/scheduler" />
         </Switch>
