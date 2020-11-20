@@ -6,7 +6,7 @@ An app that helps you schedule interviews efficiently and saves you the hassle o
 - Gives a glance at all the upcoming interviews.
 - Helps create new interviews on the specified date and time.
 - Checks for conflicting interviews.
-- Edit previously scheduled emails.
+- Edit previously scheduled interviews.
 - Automated emailing to attendees of the interview.
 
 Screenshots:
