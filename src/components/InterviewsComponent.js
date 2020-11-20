@@ -1,6 +1,5 @@
 import React, { Component } from 'react';
 import { baseUrl } from '../baseUrl';
-import { NavItem} from 'reactstrap';
 import { NavLink } from 'react-router-dom';
 export default class Interviews extends Component {
 
@@ -46,7 +45,7 @@ export default class Interviews extends Component {
 
   render() {
     return (
-      <div className>
+      <div style={{padding:10}}>
         <h4 className="text-center">Upcoming interviews</h4>
         <table className="table table-sm table-dark" style={{color:'white'}}>
           <thead>
@@ -73,8 +72,8 @@ export default class Interviews extends Component {
                         return(
                         <li>
                          <p> {interviewer.name}</p>
-                          <ul><li>
-                          <p>{interviewer.email}</p></li></ul>
+                          <li>
+                          <p>- {interviewer.email}</p></li>
                         </li>
                         )
                       })}
@@ -84,14 +83,14 @@ export default class Interviews extends Component {
                         return(
                         <li>
                           <p>{interviewee.name}</p>
-                          <ul><li>
-                          <p>{interviewee.email}</p></li></ul>
+                          <li>
+                          <p>- {interviewee.email}</p></li>
                           </li>
                         )
                       })}
                   </td>
 
-                <td><NavItem><NavLink to={"/scheduler/"+(interview._id)}><button className="btn btn-primary">Edit</button></NavLink></NavItem></td>
+                <td><NavLink to={"/scheduler/"+(interview._id)}><button className="btn btn-primary">Edit</button></NavLink></td>
                 </tr> 
               )
             })}

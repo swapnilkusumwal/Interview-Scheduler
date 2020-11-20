@@ -2,24 +2,53 @@ var express = require("express");
 const Interviews = require("../models/interviews");
 var router = express.Router();
 const UserInterviews = require("../models/userInterviews");
-var moment=require('moment');
-// console.log(moment)
-/* GET users listing. */
 var smtp = require("../smtp");
+var ics=require('ics');
 
-let mailOptions = {
-  from: mailerConfig.auth.user,
-  subject: "Interview Schedule",
+// function to send mails to all recipient
+function createEmail(start_time,hour,minute,attendees_list,sendTo){
+  const event = {
+  start: [start_time.getFullYear(),start_time.getMonth()+1,start_time.getDate(),start_time.getHours(),start_time.getMinutes()],
+  duration:{hours:hour,minutes:minute},
+  title: "Interview Scheduled",
+  description: "An interview has been scheduled",
+  location: 'Google Meet',
+  status: 'CONFIRMED',
+  organizer: { name: 'Swapnil Kusumwal', email: 'support@datainn.in' },
+  attendees: attendees_list
 };
-router.get("/", (req, res, next) => {
-  Interviews.find({startTime:{$gte:new Date()}}).then((data) => {
+
+  ics.createEvent(event, (error, value) => {
+  if (error) {
+    console.log(error)
+    return;
+  }
+
+  let mailOptions = {
+    from: mailerConfig.auth.user,
+    to: sendTo,
+    subject: "Interview Scheduled",
+    text: "Your interview has been scheduled",
+    icalEvent: {
+      filename: 'invitation.ics',
+      method: 'request',
+      content: value.toString()
+    }
+  };
+  smtp.temp(mailOptions);
+
+  })
+}
+
+// retreives all upcoming interviews along with user details
+router.get("/", (req, res) => {
+  Interviews.find({startTime:{$gt:new Date()}}).then((data) => {
     let result = data.map((a) => a._id.toString());
     UserInterviews.find({ interview: { $in: result } })
       .populate("email")
       .populate("interview")
       .then((result) => {
-        // console.log(result);
-        var reply = [];
+        let reply = [];
         let hash_map = {};
         let k = 0;
         for (let i = 0; i < result.length; i++) {
@@ -39,16 +68,13 @@ router.get("/", (req, res, next) => {
             reply[hash_map[result[i].interview._id]].interviewer.push(
               result[i].email
             );
-            // console.log(reply,"THIS");
           } else {
-            // console.log("THERE");
             reply[hash_map[result[i].interview._id]].interviewee.push(
               result[i].email
             );
-            // console.log(reply,"That");
           }
         }
-        // console.log(result);
+        reply.sort((a, b) => (a.startTime > b.startTime) ? 1 : -1)
         res.statusCode = 200;
         res.setHeader("Content-Type", "application/json");
         res.json({interviews:reply});
@@ -63,7 +89,8 @@ router.get("/", (req, res, next) => {
   });
 });
 
-router.post("/", function (req, res, next) {
+// To create a fresh interview
+router.post("/", async function (req, res, next) {
   console.log("STILL HERE");
   if (req.body.selectedCandidates.length < 2) {
     res.setHeader("Content-Type", "application/json");
@@ -72,9 +99,16 @@ router.post("/", function (req, res, next) {
     res.end();
     return;
   }
+  else if(req.body.startTime>req.body.endTime){
+    res.setHeader("Content-Type", "application/json");
+    res.statusCode = 400;
+    res.json("Please select appropriate time")
+    res.end();
+    return;
+  }
   let startTime = req.body.startTime;
   let endTime = req.body.endTime;
-  Interviews.find({
+  let interviews=await Interviews.find({
     $or: [
       {
         $and: [
@@ -85,8 +119,7 @@ router.post("/", function (req, res, next) {
       {
         $and: [
           { startTime: { $lte: startTime } },
-          { endTime: { $lte: endTime } },
-          { endTime: { $gte: startTime } },
+          { endTime: { $gte: endTime } },
         ],
       },
       {
@@ -96,140 +129,97 @@ router.post("/", function (req, res, next) {
         ],
       },
     ],
+  }).catch(err=>{
+    res.statusCode = 500;
+    res.setHeader("Content-Type", "application/json");
+    res.json("Cannot create interviews right now. Please try again later.");
+    res.end();
   })
-    .then(
-      async (data) => {
-        let result = [];
-        if (data.length) {
-          result = data.map((a) => a._id.toString());
-          // console.log(result);
-          await UserInterviews.find({
-            $and: [
-              { interview: { $in: result } },
-              { email: { $in: req.body.selectedCandidates } },
-            ],
-          })
-            .then(
-              async (data) => {
-                if (data.length > 0) {
-                  res.statusCode = 400;
-                  res.setHeader("Content-Type", "application/json");
-                  res.json("Conflicting Interviews");
-                  res.end();
-                } else {
-                  await Interviews.create({
-                    startTime: req.body.startTime,
-                    endTime: req.body.endTime,
-                  })
-                    .then((data) => {
-                      return data._id;
-                    })
-                    .then(
-                      async (id) => {
-                        let insertionArray = [];
-                        let selectedCandidates = req.body.selectedCandidates,
-                          selectedInterviewers = req.body.selectedInterviewers;
-                        // console.log(req.body.selectedCandidates,"ASDSADASDAS");
-                        let selectedCandidatesEmail =
-                          req.body.selectedCandidatesEmail;
+  let createInterview=async()=>{
+    return await Interviews.create({
+      startTime: req.body.startTime,
+      endTime: req.body.endTime,
+    }).catch(err=>{
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.json("Cannot create interviews right now. Please try again later.");
+      res.end();
+    })
+  }
+  let user_interviews=[];
+  if (interviews.length) {
+    let result = [];
+    result = await interviews.map((a) => a._id.toString());
+    user_interviews=await UserInterviews.find({
+      $and: [
+        { interview: { $in: result } },
+        { email: { $in: req.body.selectedCandidates } },
+      ],
+    }).catch(err=>{
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.json("Cannot create interviews right now. Please try again later.");
+      res.end();
+    })
+  }
+  
+  if (user_interviews.length > 0) {
+    res.statusCode = 400;
+    res.setHeader("Content-Type", "application/json");
+    res.json("Conflicting Interviews");
+    res.end();
+  } else {
+    let id=await createInterview();
+    
+    let insertionArray = [];
+    let selectedCandidates = req.body.selectedCandidates,
+    selectedInterviewers = req.body.selectedInterviewers;
+    let selectedCandidatesEmail = req.body.selectedCandidatesEmail;
+    let attendees_list=[];
+    let sendTo = "";
+    for (let i = 0; i < selectedCandidates.length; i++) {
+      let obj = {
+        email: selectedCandidates[i],
+        interview: id,
+      };
+      if (selectedInterviewers.indexOf(selectedCandidates[i]) === -1) {
+        obj.role = false;
+      } else obj.role = true;
+      insertionArray.push(obj);
+      attendees_list.push({email:selectedCandidatesEmail[i]})
+      sendTo += selectedCandidatesEmail[i];
+      if(i+1<selectedCandidates.length){
+          sendTo += ','
+      }
+    }
 
-                        for (let i = 0; i < selectedCandidates.length; i++) {
-                          let obj = {
-                            email: selectedCandidates[i],
-                            interview: id,
-                          };
-                          mailOptions.to = selectedCandidatesEmail[i];
-                          mailOptions.html =
-                            `<body>` +
-                            `<p>Your interview is scheduled From: ${moment(req.body.startTime).format('LLLL')}\n To: ${moment(req.body.endTime).format('LLLL')}
-            </p>` +
-                            `</body>`;
-                          // console.log(mailOptions);
-                          smtp.temp(mailOptions);
-                          if (
-                            selectedInterviewers.indexOf(
-                              selectedCandidates[i]
-                            ) === -1
-                          ) {
-                            obj.role = false;
-                          } else obj.role = true;
-                          insertionArray.push(obj);
-                        }
-                        await UserInterviews.create(insertionArray)
-                          .then(
-                            (data) => {
-                              res.statusCode = 200;
-                              res.setHeader("Content-Type", "application/json");
-                              res.json("Interview Scheduled");
-                              res.end();
-                            },
-                            (err) => next(err)
-                          )
-                          .catch((err) => next(err));
-                      },
-                      (err) => next(err)
-                    )
-                    .catch((err) => next(err));
-                }
-              },
-              (err) => next(err)
-            )
-            .catch((err) => next(err));
-        } else {
-          await Interviews.create({
-            startTime: req.body.startTime,
-            endTime: req.body.endTime,
-          })
-            .then((data) => {
-              return data._id;
-            })
-            .then(
-              async (id) => {
-                let insertionArray = [];
-                let selectedCandidates = req.body.selectedCandidates,
-                  selectedInterviewers = req.body.selectedInterviewers;
-                // console.log(req.body.selectedCandidates,"ASDSADASDAS");
-                let selectedCandidatesEmail = req.body.selectedCandidatesEmail;
+    let created_user_interviews=await UserInterviews.create(insertionArray).catch(err=>{
+    res.statusCode = 500;
+    res.setHeader("Content-Type", "application/json");
+    res.json("Cannot create interviews right now. Please try again later.");
+    res.end();
+  })
+  
+  let start_time=new Date(startTime);
+  let end_time= new Date(endTime);
+  let time_difference=(end_time-start_time)/1000;
+  let hour=parseInt(time_difference/3600);
+  let minute=Math.ceil((time_difference%3600)/60);
+  // console.log(time_difference,hour);
+  await createEmail(start_time,hour,minute,attendees_list,sendTo);
 
-                for (let i = 0; i < selectedCandidates.length; i++) {
-                  let obj = { email: selectedCandidates[i], interview: id };
-                  mailOptions.to = selectedCandidatesEmail[i];
-                  mailOptions.html =
-                    `<body>` +
-                    `<p>Your interview is scheduled From: ${moment(req.body.startTime).format('LLLL')}\n To: ${moment(req.body.endTime).format('LLLL')}
-            </p>` +
-                    `</body>`;
-                  // console.log(mailOptions);
-                  smtp.temp(mailOptions);
-                  if (
-                    selectedInterviewers.indexOf(selectedCandidates[i]) === -1
-                  ) {
-                    obj.role = false;
-                  } else obj.role = true;
-                  insertionArray.push(obj);
-                }
-                await UserInterviews.create(insertionArray)
-                  .then(
-                    (data) => {
-                      res.statusCode = 200;
-                      res.setHeader("Content-Type", "application/json");
-                      res.json("Interview Scheduled");
-                      res.end();
-                    },
-                    (err) => next(err)
-                  )
-                  .catch((err) => next(err));
-              },
-              (err) => next(err)
-            )
-            .catch((err) => next(err));
-        }
-      },
-      (err) => next(err)
-    )
-    .catch((err) => next(err));
-});
-router.post("/:currentid", function (req, res, next) {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "application/json");
+  res.json("Interview Scheduled");
+  res.end();
+        
+  }
+})
+
+//to edit an existing interview
+router.post("/:currentid",async function (req, res) {
+
+  console.log(req.params.currentid);
   if (req.body.selectedCandidates.length < 2) {
     res.setHeader("Content-Type", "application/json");
     res.statusCode=400;
@@ -237,11 +227,16 @@ router.post("/:currentid", function (req, res, next) {
     res.end();
     return;
   }
-  console.log(req.params.currentid);
-  // console.log(req.body);
+  else if(req.body.startTime>req.body.endTime){
+    res.setHeader("Content-Type", "application/json");
+    res.statusCode = 400;
+    res.json("Please select appropriate time")
+    res.end();
+    return;
+  }
   let startTime = req.body.startTime;
   let endTime = req.body.endTime;
-  Interviews.find({
+  let interviews=await Interviews.find({
     $and: [
       {
         $or: [
@@ -254,8 +249,7 @@ router.post("/:currentid", function (req, res, next) {
           {
             $and: [
               { startTime: { $lte: startTime } },
-              { endTime: { $lte: endTime } },
-              { endTime: { $gte: startTime } },
+              { endTime: { $gte: endTime } },
             ],
           },
           {
@@ -268,110 +262,88 @@ router.post("/:currentid", function (req, res, next) {
       },
       { _id: { $ne: req.body.id } },
     ],
-  })
-    .then(async(data) => {
-      let result = [];
-      if (data.length) {
-        result = data.map((a) => a._id.toString());
-        // console.log(result);
-        await UserInterviews.find({
-          $and: [
-            { interview: { $in: result } },
-            { email: { $in: req.body.selectedCandidates } },
-          ],
-        })
-        .then(async (data) => {
-          if (data.length > 0) {
-            res.statusCode = 400;
-            res.setHeader("Content-Type", "application/json");
-            res.json("Clashing Interviews");
-            res.end();
-            return;
-          } else {
-            await Interviews.findByIdAndUpdate(
-              req.body.id,
-              { startTime: req.body.startTime, endTime: req.body.endTime },
-              { upsert: true }
-            )
-              .then(async(data) => {
-                return data._id;
-              })
-              .then(async (id) => {
-                let insertionArray = [];
-                let selectedCandidates = req.body.selectedCandidates,
-                  selectedInterviewers = req.body.selectedInterviewers;
-                let selectedCandidatesEmail = req.body.selectedCandidatesEmail;
-                // console.log(req.body.selectedCandidates,"ASDSADASDAS");
-                for (let i = 0; i < selectedCandidates.length; i++) {
-                  mailOptions.to = selectedCandidatesEmail[i];
-                  mailOptions.html =
-                    `<body>` +
-                    `<p>Your interview is scheduled From: ${moment(req.body.startTime).format('LLLL')}\n To: ${moment(req.body.endTime).format('LLLL')}
-              </p>` +
-                    `</body>`;
-                  // console.log(mailOptions);
-                  smtp.temp(mailOptions);
-                  let obj = { email: selectedCandidates[i], interview: id };
-                  if (selectedInterviewers.indexOf(selectedCandidates[i]) === -1) {
-                    obj.role = false;
-                  } else obj.role = true;
-                  insertionArray.push(obj);
-                }
-                await UserInterviews.deleteMany({ interview: id }).then(async() => {
-                  await UserInterviews.create(insertionArray).then(() => {
-                    res.statusCode = 200;
-                    res.setHeader("Content-Type", "application/json");
-                    res.json("Interview Scheduled");
-                    res.end();
-                    return;
-                  });
-                });
-              });
-          }
-        });
-      } else {
-        await Interviews.findByIdAndUpdate(
-          req.body.id,
-          { startTime: req.body.startTime, endTime: req.body.endTime },
-          { upsert: true }
-        )
-          .then(async(data) => {
-            return data._id;
-          })
-          .then(async (id) => {
-            let insertionArray = [];
-            let selectedCandidates = req.body.selectedCandidates,
-              selectedInterviewers = req.body.selectedInterviewers;
-            let selectedCandidatesEmail = req.body.selectedCandidatesEmail;
-            // console.log(req.body.selectedCandidates,"ASDSADASDAS");
-            for (let i = 0; i < selectedCandidates.length; i++) {
-              mailOptions.to = selectedCandidatesEmail[i];
-              mailOptions.html =
-                `<body>` +
-                `<p>Your interview is scheduled From: ${moment(req.body.startTime).format('LLLL')}\n To: ${moment(req.body.endTime).format('LLLL')}
-          </p>` +
-                `</body>`;
-              // console.log(mailOptions);
-              smtp.temp(mailOptions);
-              let obj = { email: selectedCandidates[i], interview: id };
-              if (selectedInterviewers.indexOf(selectedCandidates[i]) === -1) {
-                obj.role = false;
-              } else obj.role = true;
-              insertionArray.push(obj);
-            }
-            console.log(insertionArray);
-            await UserInterviews.deleteMany({ interview: id }).then(async() => {
-              await UserInterviews.create(insertionArray).then(() => {
-                res.statusCode = 200;
-                res.setHeader("Content-Type", "application/json");
-                res.json("Interview Scheduled");
-                res.end();
-                return;
-              });
-            });
-          });
-      }
+    }).catch(err=>{
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.json("Cannot edit interviews right now. Please try again later.");
+      res.end();
     })
+    let user_interviews=[];
+    
+    if (interviews.length) {
+      let result = [];
+      result = interviews.map((a) => a._id.toString());
+      user_interviews=await UserInterviews.find({
+        $and: [
+          { interview: { $in: result } },
+          { email: { $in: req.body.selectedCandidates } },
+        ],
+      }).catch(err=>{
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/json");
+        res.json("Cannot create interviews right now. Please try again later.");
+        res.end();
+      })
+    }
+    if (user_interviews.length > 0) {
+      res.statusCode = 400;
+      res.setHeader("Content-Type", "application/json");
+      res.json("Clashing Interviews");
+      res.end();
+      return;
+    } 
+    
+    let current_interview=await Interviews.findByIdAndUpdate(req.body.id,{ startTime: req.body.startTime, endTime: req.body.endTime },
+      { upsert: true }).catch(err=>{
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/json");
+        res.json("Cannot edit interviews right now. Please try again later.");
+        res.end();
+      })
+    
+    let id=current_interview._id;
+    let insertionArray = [];
+    let selectedCandidates = req.body.selectedCandidates,
+    selectedInterviewers = req.body.selectedInterviewers;
+    let selectedCandidatesEmail = req.body.selectedCandidatesEmail;
+    let attendees_list=[];
+    let sendTo="";
+
+    for (let i = 0; i < selectedCandidates.length; i++) {
+      let obj = { email: selectedCandidates[i], interview: id };
+      if (selectedInterviewers.indexOf(selectedCandidates[i]) === -1) {
+        obj.role = false;
+      } else obj.role = true;
+      insertionArray.push(obj);
+      attendees_list.push({email:selectedCandidatesEmail[i]})
+      sendTo += selectedCandidatesEmail[i];
+      if(i+1<selectedCandidatesEmail.length){
+          sendTo += ','
+      }
+    }
+    let create_interview=await UserInterviews.deleteMany({ interview: id }).catch(err=>{
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.json("Cannot create interviews right now. Please try again later.");
+      res.end();
+    })
+    create_interview=await UserInterviews.create(insertionArray).catch(err=>{
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.json("Cannot create interviews right now. Please try again later.");
+      res.end();
+    })
+    let start_time=new Date(startTime);
+    let end_time= new Date(endTime);
+    let time_difference=(end_time-start_time)/1000;
+    let hour=parseInt(time_difference/3600);
+    let minute=Math.ceil((time_difference%3600)/60);
+    console.log(time_difference,hour);
+    await createEmail(start_time,hour,minute,attendees_list,sendTo);
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json");
+    res.json("Interview Scheduled");
+    res.end();
 });
 
 module.exports = router;
