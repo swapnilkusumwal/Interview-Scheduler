@@ -1,3 +1,15 @@
-Clone the project then go to the folder and run command "yarn" . Then use the command "cd backend" then use "yarn start" to start the server then go to localhost:3000 .
-Link to website http://45.79.127.113:3000/
+# Interview Scheduler 
+___
+An app that helps you schedule interviews much more efficiently. 
+
+## Top Features:
+- Gives a glance at all the upcoming interviews.
+- Helps create new interviews on the specified date and time.
+- Checks for conflicting interviews.
+- Edit previously scheduled emails.
+- Automated emailing to attendees of the interview.
+
+Screenshots:
+![Image1](/screenshots/1.png)
+![Image2](/screenshots/2.png)
 
