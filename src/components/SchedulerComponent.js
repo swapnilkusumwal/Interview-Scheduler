@@ -12,7 +12,9 @@ export default class Scheduler extends Component {
       startTime:new Date(),
       endTime:'',
       currentId:'',
-      nope:false
+      nope:false,
+      newUserEmail:'',
+      newUserName:''
     }
 
     this.fetchCandidateList = this.fetchCandidateList.bind(this);
@@ -39,6 +41,40 @@ export default class Scheduler extends Component {
     }
     else{
       selectedInterviewers.splice(index,1);
+    }
+  }
+  handleAddUser=()=>{
+    let obj={
+      email:this.state.newUserEmail,
+      name:this.state.newUserName
+    }
+    if(this.state.newUserEmail=='' || this.state.newUserName==''){
+      alert("Please enter new user's details");
+    }
+    else{
+      fetch(baseUrl+'users/',{
+        method:'POST',
+        body:JSON.stringify(obj),
+        headers:{
+          'Content-Type': 'application/json'
+        },
+        credentials:'same-origin'
+      })
+      .then(response => {
+        if (response.ok) {
+          console.log(response);
+          window.location.reload();
+          return response;
+        } else {
+          return response.json().then((body) => {
+            // throw ("Error "+response.status.toString()+" "+response.statusText+" \n"+body)
+            throw(body);
+          })
+        }
+      })
+      .then(response=>response.json())
+      .catch(error=>{console.log('Details ',error)
+        alert('Error adding new user \n'+error)})  
     }
   }
   handleSubmit=()=>{
@@ -156,6 +192,13 @@ export default class Scheduler extends Component {
                   </tr> 
                 )
               })}
+              <tr>
+                <td>
+                  <input type="text" placeholder="Enter new user's name" onChange={(event)=>this.setState({newUserName:event.target.value})} value={this.state.newUserName} />
+                  <input type="text" placeholder="Enter new user's email" onChange={(event)=>this.setState({newUserEmail:event.target.value})} value={this.state.newUserEmail} style={{marginLeft:'10px'}}/>
+                  <div className="btn btn-primary" style={{marginLeft:'10px',borderRadius:35}} onClick={()=>this.handleAddUser()}>Add User</div>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>

@@ -11,18 +11,7 @@ var usersRouter = require('./routes/users');
 var interviewsRouter = require('./routes/interviews');
 
 var app = express();
-// var smtp=require('./smtp');
-
-// let mailOptions = {
-//   from: mailerConfig.auth.user,
-//   to: 'swapnilkusumwal@gmail.com',
-//   subject: 'Some Subject',
-//   html: `<body>` +
-//       `<p>Your interview has been scheduled</p>`
-      
-// };
-// smtp.temp(mailOptions);
-const url=config.mongoUrl;
+const url=config.mongoURI;
 const connect = mongoose.connect(url,{useNewUrlParser: true,useUnifiedTopology: true,useFindAndModify: false});
 
 connect.then((db)=>{
