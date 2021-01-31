@@ -16,6 +16,7 @@ Link to website - https://schedule-interview.herokuapp.com
 - Select the users that you want to interview by clicking the select checkbox.
 - Select the interviewer by clicking the interviewer checkbox also select the select checkbox.
 - Select the appropriate time.
+- Click on the submit button.
 - And it's done! 
 
 Screenshots:
